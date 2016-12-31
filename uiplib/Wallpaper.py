@@ -1,5 +1,7 @@
 """Module that gets and sets Wallpaper."""
 
+import os
+import subprocess
 import sys
 
 
@@ -19,11 +21,26 @@ class Wallpaper:
 
     def set_wallpaper_linux(self, filename):
         """Set a file as linux Wallpaper."""
-        from gi.repository import Gio
+        de = self.get_linux_desktop_environment()
+        if de == 'gnome':
+            from gi.repository import Gio
 
-        gsettings = Gio.Settings.new('org.gnome.desktop.background')
-        gsettings.set_string('picture-uri', "file://" + filename)
-        gsettings.apply()
+            gsettings = Gio.Settings.new('org.gnome.desktop.background')
+            gsettings.set_string('picture-uri', "file://" + filename)
+            gsettings.apply()
+        elif de == 'kde':
+            args = ["qdbus", "org.kde.plasmashell", "/PlasmaShell",
+                    "org.kde.PlasmaShell.evaluateScript",
+                    ("var allDesktops = desktops();"
+                     "print (allDesktops);"
+                     "for (i=0;i<allDesktops.length;i++)"
+                     "{d = allDesktops[i];"
+                     "d.wallpaperPlugin = \"org.kde.image\";"
+                     "d.currentConfigGroup = Array(\"Wallpaper\", "
+                     "\"org.kde.image\", \"General\");"
+                     "d.writeConfig(\"Image\","
+                     "\"file://%s\")}" % filename)]
+            subprocess.Popen(args)
 
     def set_wallpaper_windows(self, filename):  # pragma: no cover
         """Set a file as windows Wallpaper."""
@@ -60,10 +77,12 @@ class Wallpaper:
 
     def get_wallpaper_linux(self):
         """Get current linux Wallpaper."""
-        from gi.repository import Gio
+        de = self.get_linux_desktop_environment()
+        if de == 'gnome':
+            from gi.repository import Gio
 
-        gsettings = Gio.Settings.new('org.gnome.desktop.background')
-        return gsettings.get_string('picture-uri')[7:]
+            gsettings = Gio.Settings.new('org.gnome.desktop.background')
+            return gsettings.get_string('picture-uri')[7:]
 
     def get_wallpaper_windows(self):  # pragma: no cover
         """Get current windows Wallpaper."""
@@ -88,3 +107,10 @@ class Wallpaper:
             # set wallpaper for each display
             wallpaper_set.add(desk.picture.get())
         return list(wallpaper_set)
+
+    def get_linux_desktop_environment(self):
+        """Get the current linux desktop enviroment."""
+        if os.getenv('KDE_FULL_SESSION'):
+            return 'kde'
+        elif os.getenv('GNOME_DESKTOP_SESSION_ID'):
+            return 'gnome'
